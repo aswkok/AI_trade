@@ -1,0 +1,57 @@
+{
+  "timestamp": "2025-05-22T15:40:02.921306",
+  "symbols": [
+    "NVDA"
+  ],
+  "selected_symbol": "NVDA",
+  "current_view": "quotes",
+  "system_messages": [
+    "2025-05-20 19:55:33,157 - Initialized continuous options trading service for ['NVDA']",
+    "2025-05-21 08:28:49,255 - Display state loaded",
+    "2025-05-21 09:45:58,075 - Display state loaded",
+    "2025-05-21 09:47:24,480 - Display state loaded",
+    "2025-05-21 09:47:24,656 - Not enough data for NVDA yet. Have 0 quotes, need at least 42",
+    "2025-05-21 09:48:04,583 - Display state loaded",
+    "2025-05-21 09:48:05,306 - Not enough data for NVDA yet. Have 0 quotes, need at least 42",
+    "2025-05-21 09:49:05,364 - Not enough data for NVDA yet. Have 1 quotes, need at least 42",
+    "2025-05-21 10:05:16,794 - Display state loaded",
+    "2025-05-21 10:05:27,150 - Not enough data for NVDA yet. Have 1 quotes, need at least 42",
+    "2025-05-21 10:06:50,637 - Display state loaded",
+    "2025-05-21 10:17:08,637 - Display state loaded",
+    "2025-05-21 10:17:10,356 - Error updating trader for NVDA: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+    "2025-05-21 10:18:51,880 - Display state loaded",
+    "2025-05-21 10:18:57,950 - Error updating trader for NVDA: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+    "2025-05-21 10:19:03,048 - Error updating trader for NVDA: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+    "2025-05-21 10:22:40,116 - Display state loaded",
+    "2025-05-21 10:22:45,996 - Error updating trader for NVDA: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+    "2025-05-21 10:22:51,099 - Error updating trader for NVDA: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+    "2025-05-21 10:22:56,197 - Error updating trader for NVDA: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+    "2025-05-21 10:23:01,308 - Error updating trader for NVDA: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+    "2025-05-21 10:23:06,422 - Error updating trader for NVDA: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+    "2025-05-21 10:26:35,383 - Display state loaded",
+    "2025-05-21 10:26:42,450 - Error updating trader for NVDA: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+    "2025-05-21 10:26:47,536 - Error updating trader for NVDA: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().",
+    "2025-05-21 10:59:08,332 - Display state loaded",
+    "2025-05-22 15:01:15,816 - Display state loaded",
+    "2025-05-22 15:39:30,739 - Display state loaded"
+  ],
+  "trade_history": [],
+  "latest_quotes": {
+    "NVDA": {
+      "timestamp": "2025-05-22T15:39:54.935642",
+      "bid": 133.29317500000002,
+      "ask": 133.626825,
+      "spread": 0.33365,
+      "spread_pct": 0.2503128911138923,
+      "mid": 133.46,
+      "EMAfast": 133.59315773309055,
+      "EMAslow": 133.65618329790587,
+      "MACD": -0.06302556481531951,
+      "Signal": -0.05368429722246182,
+      "Histogram": -0.009341267592857694,
+      "MACD_position": "BELOW",
+      "crossover": false,
+      "crossunder": false
+    }
+  }
+}

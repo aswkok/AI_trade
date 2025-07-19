@@ -1,0 +1,22 @@
+{
+  "timestamp": "2025-05-20T19:52:54.029604",
+  "symbols": [
+    "NVDA"
+  ],
+  "system_messages": [
+    "2025-05-20 19:42:42,216 - Web display started",
+    "2025-05-20 19:46:12,802 - Display state loaded",
+    "2025-05-20 19:46:12,802 - Web display started"
+  ],
+  "trade_history": [],
+  "latest_quotes": {
+    "NVDA": {
+      "timestamp": "2025-05-20T19:52:14.107373",
+      "bid": 134.03224999999998,
+      "ask": 134.36775,
+      "spread": 0.33549999999999996,
+      "spread_pct": 0.2503128911138924,
+      "mid": 134.2
+    }
+  }
+}

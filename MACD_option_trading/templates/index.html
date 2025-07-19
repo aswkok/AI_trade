@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MACD Options Trading System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">MACD Options Trading System</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#quotes">Latest Quotes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#history">Quote History</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#trades">Trade History</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#messages">System Messages</a>
+                    </li>
+                </ul>
+                <div class="ms-auto d-flex align-items-center">
+                    <div class="dropdown me-3">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" id="symbolDropdown" data-bs-toggle="dropdown">
+                            Select Symbol
+                        </button>
+                        <ul class="dropdown-menu" id="symbolList">
+                            {% for symbol in symbols %}
+                            <li><a class="dropdown-item symbol-item" href="#" data-symbol="{{ symbol }}">{{ symbol }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <span class="text-light me-3" id="currentTime"></span>
+                    <button class="btn btn-outline-light" id="refreshButton">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-3">
+        <div class="tab-content">
+            <!-- Latest Quotes Tab -->
+            <div class="tab-pane fade show active" id="quotes">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">Latest Quote Data</h5>
+                            </div>
+                            <div class="card-body" id="quoteData">
+                                <div class="alert alert-info">Select a symbol to view quote data</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="card-title mb-0">MACD Indicators</h5>
+                            </div>
+                            <div class="card-body" id="macdData">
+                                <div class="alert alert-info">Select a symbol to view MACD data</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">Recent System Messages</h5>
+                                <button class="btn btn-sm btn-outline-light" id="viewAllMessages">View All</button>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover" id="recentMessagesTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Timestamp</th>
+                                                <th>Message</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Messages will be populated here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quote History Tab -->
+            <div class="tab-pane fade" id="history">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">Quote History</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <canvas id="priceChart" height="300"></canvas>
+                            </div>
+                            <div class="col-md-6">
+                                <canvas id="macdChart" height="300"></canvas>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover" id="historyTable">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Bid</th>
+                                        <th>Ask</th>
+                                        <th>Mid</th>
+                                        <th>MACD</th>
+                                        <th>Signal</th>
+                                        <th>Histogram</th>
+                                        <th>Position</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- History data will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trade History Tab -->
+            <div class="tab-pane fade" id="trades">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">Trade History</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover" id="tradesTable">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Symbol</th>
+                                        <th>Action</th>
+                                        <th>Quantity</th>
+                                        <th>Price</th>
+                                        <th>Strategy</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Trade data will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Messages Tab -->
+            <div class="tab-pane fade" id="messages">
+                <div class="card">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">System Messages</h5>
+                        <button class="btn btn-sm btn-outline-light" id="clearMessages">Clear All</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="messageFilter" placeholder="Filter messages...">
+                                    <button class="btn btn-outline-secondary" type="button" id="applyFilter">Filter</button>
+                                    <button class="btn btn-outline-secondary" type="button" id="clearFilter">Clear</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-primary" id="showAll">All</button>
+                                    <button type="button" class="btn btn-outline-success" id="showBullish">Bullish</button>
+                                    <button type="button" class="btn btn-outline-danger" id="showBearish">Bearish</button>
+                                    <button type="button" class="btn btn-outline-warning" id="showTrades">Trades</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover" id="messagesTable">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Message</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Messages will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div>
+                                <span id="messageCount">0</span> messages
+                            </div>
+                            <nav>
+                                <ul class="pagination" id="messagePagination">
+                                    <!-- Pagination will be populated here -->
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

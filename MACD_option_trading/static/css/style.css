@@ -1,0 +1,147 @@
+/* Custom styles for MACD Options Trading System Web Display */
+
+body {
+    background-color: #f8f9fa;
+}
+
+.card {
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    font-weight: bold;
+}
+
+.table th {
+    font-weight: bold;
+    background-color: #f0f0f0;
+}
+
+.bullish {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.bearish {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.trade {
+    color: #17a2b8;
+    font-weight: bold;
+}
+
+.macd-box {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background-color: #f8f9fa;
+}
+
+.macd-value {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.macd-above {
+    color: #28a745;
+}
+
+.macd-below {
+    color: #dc3545;
+}
+
+.signal-box {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 10px;
+    margin-top: 10px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.bullish-signal {
+    background-color: rgba(40, 167, 69, 0.2);
+    border-color: #28a745;
+    color: #28a745;
+}
+
+.bearish-signal {
+    background-color: rgba(220, 53, 69, 0.2);
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.neutral-signal {
+    background-color: rgba(108, 117, 125, 0.2);
+    border-color: #6c757d;
+    color: #6c757d;
+}
+
+.quote-timestamp {
+    font-style: italic;
+    color: #6c757d;
+    margin-bottom: 10px;
+}
+
+.price-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.price-box {
+    text-align: center;
+    padding: 10px;
+    border-radius: 5px;
+    flex: 1;
+    margin: 0 5px;
+}
+
+.price-box.bid {
+    background-color: rgba(40, 167, 69, 0.1);
+    border: 1px solid #28a745;
+}
+
+.price-box.ask {
+    background-color: rgba(220, 53, 69, 0.1);
+    border: 1px solid #dc3545;
+}
+
+.price-box.spread {
+    background-color: rgba(108, 117, 125, 0.1);
+    border: 1px solid #6c757d;
+}
+
+.price-label {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.price-value {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.bid-price {
+    color: #28a745;
+}
+
+.ask-price {
+    color: #dc3545;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .price-info {
+        flex-direction: column;
+    }
+    
+    .price-box {
+        margin: 5px 0;
+    }
+}

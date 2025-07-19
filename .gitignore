@@ -1,0 +1,112 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Data cache
+data_cache/
+*.csv
+
+# Trading state and results
+strategy_state/
+results/
+state/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# PyCharm
+.idea/
+
+# Coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Local development
+local_*
+test_*
+demo_*
+
+# Trading specific
+trading.log
+integrated_trading.log
+unified_trading.log
+options_trading.log
+
+# UUID folders (temporary)
+*/READ\ ME.txt
+*/*/*/*uuid*/
+
+# Backup files
+*.bak
+*.backup
