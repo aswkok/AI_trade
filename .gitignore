@@ -102,11 +102,69 @@ trading.log
 integrated_trading.log
 unified_trading.log
 options_trading.log
+continuous_trading.log
+web_display.log
+
+# IBKR TWS API
+*.tws
+tws_data/
+ibgw_data/
+*_portfolio.json
+*_positions.json
+trading_stats.json
+
+# API keys and credentials (additional security)
+*.key
+*.pem
+*.p12
+credentials.json
+secrets/
+config.ini
+settings.ini
+
+# Market data files
+*.marketdata
+*.tick
+historical_data/
+tick_data/
+price_data/
+
+# Financial data formats
+*.xlsx
+*.xls
+*.json.bak
+*.pickle
+*.pkl
 
 # UUID folders (temporary)
 */READ\ ME.txt
 */*/*/*uuid*/
+*/8769f5d3-8762-4327-90d8-16c88ab5399d/
+
+# Model artifacts
+*.model
+*.joblib
+*.h5
+models/
+checkpoints/
+
+# Configuration backups
+*_config.json.bak
+*_settings.json.bak
+display_*.json
+web_display_state.json
 
 # Backup files
 *.bak
 *.backup
+*.orig
+
+# Lock files
+*.lock
+poetry.lock
+Pipfile.lock
+
+# macOS extended attributes
+.fseventsd/
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
