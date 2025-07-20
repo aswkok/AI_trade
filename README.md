@@ -124,6 +124,134 @@ FORCE_BROKER=AUTO           # AUTO = IBKR first, then Alpaca
 
 See [IBKR_SETUP.md](IBKR_SETUP.md) for detailed setup instructions.
 
+## 🎯 Command Line Interface
+
+### 📋 Available Arguments
+
+The `quant_main.py` script supports the following command line arguments:
+
+```bash
+python quant_main.py [OPTIONS]
+```
+
+| Argument | Type | Choices | Default | Description |
+|----------|------|---------|---------|-------------|
+| `--mode` | str | `historical`, `realtime`, `continuous` | `historical` | **Trading execution mode** |
+| `--symbols` | str[] | Any valid symbols | `['NVDA']` | **Space-separated stock symbols** to trade |
+| `--strategy` | str | `macd`, `moving_average_crossover`, `rsi`, `bollinger_bands` | `macd` | **Trading strategy** to execute |
+| `--interval` | int | Any positive integer | `1` | **Interval in minutes** for continuous mode |
+| `--broker` | str | `auto`, `ibkr`, `alpaca`, `legacy` | `auto` | **Broker selection method** |
+| `--interactive` | flag | N/A | `False` | **Enable interactive broker switching** |
+
+### 🔄 Trading Modes Explained
+
+#### **Historical Mode** (`--mode historical`)
+- **Purpose**: One-time execution using historical data only
+- **Use Case**: Backtesting, strategy validation, quick testing
+- **Execution**: Analyzes past data, generates signals, executes once, then exits
+- **Example**: 
+  ```bash
+  python quant_main.py --mode historical --symbols AAPL MSFT --strategy macd
+  ```
+
+#### **Real-time Mode** (`--mode realtime`)
+- **Purpose**: One-time execution with current market data
+- **Use Case**: Current market analysis, manual trading assistance
+- **Execution**: Gets historical context + latest quotes, trades once, then exits
+- **Example**:
+  ```bash
+  python quant_main.py --mode realtime --symbols NVDA --strategy rsi
+  ```
+
+#### **Continuous Mode** (`--mode continuous`)
+- **Purpose**: Infinite loop trading at regular intervals
+- **Use Case**: Live automated trading, production systems
+- **Execution**: Runs forever, checking signals every `--interval` minutes
+- **Example**:
+  ```bash
+  python quant_main.py --mode continuous --symbols NVDA --interval 5 --strategy macd
+  ```
+
+### 🏦 Broker Selection Options
+
+#### **Auto Mode** (`--broker auto`) - **Default**
+- **Primary**: Tries IBKR TWS API first
+- **Fallback**: Uses Alpaca API if IBKR unavailable
+- **Features**: Automatic failover, best of both platforms
+- **Example**:
+  ```bash
+  python quant_main.py --broker auto --mode continuous
+  ```
+
+#### **Force IBKR** (`--broker ibkr`)
+- **Purpose**: Force IBKR only, fail if unavailable
+- **Features**: Professional trading features, lower costs
+- **Requirements**: TWS/Gateway running with API enabled
+- **Example**:
+  ```bash
+  python quant_main.py --broker ibkr --mode continuous --symbols AAPL
+  ```
+
+#### **Force Alpaca** (`--broker alpaca`)
+- **Purpose**: Force Alpaca via unified system
+- **Features**: Enhanced system features but Alpaca execution only
+- **Benefits**: Broker switching capability, enhanced monitoring
+- **Example**:
+  ```bash
+  python quant_main.py --broker alpaca --mode realtime --symbols MSFT
+  ```
+
+#### **Legacy Mode** (`--broker legacy`)
+- **Purpose**: Original Alpaca-only system (backward compatibility)
+- **Features**: Simple, direct Alpaca connection
+- **Use Case**: Legacy configurations, debugging, comparison
+- **Example**:
+  ```bash
+  python quant_main.py --broker legacy --mode historical --symbols NVDA
+  ```
+
+### 📈 Available Trading Strategies
+
+#### **MACD Strategy** (`--strategy macd`) - **Default**
+- **Method**: Moving Average Convergence Divergence
+- **Signals**: Crossover/crossunder of MACD and Signal lines
+- **Parameters**: Fast=13, Slow=21, Signal=9 periods
+- **Best For**: Trending markets, balanced risk/reward
+- **Example**:
+  ```bash
+  python quant_main.py --strategy macd --mode continuous --interval 1
+  ```
+
+#### **Moving Average Crossover** (`--strategy moving_average_crossover`)
+- **Method**: Short MA vs Long MA crossovers
+- **Signals**: Golden cross (buy) / Death cross (sell)
+- **Parameters**: Short=20, Long=50 periods
+- **Best For**: Strong trending markets, lower frequency signals
+- **Example**:
+  ```bash
+  python quant_main.py --strategy moving_average_crossover --symbols AAPL MSFT
+  ```
+
+#### **RSI Strategy** (`--strategy rsi`)
+- **Method**: Relative Strength Index overbought/oversold
+- **Signals**: RSI < 30 (buy) / RSI > 70 (sell)
+- **Parameters**: 14 periods, 30/70 thresholds
+- **Best For**: Range-bound markets, mean reversion
+- **Example**:
+  ```bash
+  python quant_main.py --strategy rsi --mode realtime --symbols GOOGL
+  ```
+
+#### **Bollinger Bands** (`--strategy bollinger_bands`)
+- **Method**: Price touches upper/lower bands
+- **Signals**: Touch lower band (buy) / Touch upper band (sell)
+- **Parameters**: 20 periods, 2 standard deviations
+- **Best For**: Volatile markets, support/resistance trading
+- **Example**:
+  ```bash
+  python quant_main.py --strategy bollinger_bands --mode continuous --interval 10
+  ```
+
 ## 🎯 Usage Examples
 
 ### 🚀 Enhanced Quantitative Trading (IBKR + Alpaca)
@@ -149,6 +277,46 @@ python quant_main.py --broker legacy --mode continuous   # Legacy Alpaca-only
 ```bash
 python quant_main.py --interactive --mode continuous
 python demos/demo_broker_switching.py  # Demo switching capabilities
+```
+
+### 🔧 Advanced Usage Examples
+
+**Multi-Symbol Portfolio with Custom Strategy:**
+```bash
+python quant_main.py --mode continuous --symbols AAPL MSFT NVDA GOOGL META \
+                     --strategy moving_average_crossover --interval 15 --broker auto
+```
+
+**High-Frequency MACD Trading:**
+```bash
+python quant_main.py --mode continuous --symbols NVDA --strategy macd \
+                     --interval 1 --broker ibkr --interactive
+```
+
+**RSI Strategy with Real-time Analysis:**
+```bash
+python quant_main.py --mode realtime --symbols TSLA --strategy rsi --broker alpaca
+```
+
+**Bollinger Bands on Multiple Timeframes:**
+```bash
+# Fast signals (1-minute intervals)
+python quant_main.py --mode continuous --symbols SPY --strategy bollinger_bands --interval 1
+
+# Slower signals (15-minute intervals)  
+python quant_main.py --mode continuous --symbols SPY --strategy bollinger_bands --interval 15
+```
+
+**Testing Mode Comparison:**
+```bash
+# Test with historical data first
+python quant_main.py --mode historical --symbols AAPL --strategy macd
+
+# Then try real-time once
+python quant_main.py --mode realtime --symbols AAPL --strategy macd
+
+# Finally run continuous if satisfied
+python quant_main.py --mode continuous --symbols AAPL --strategy macd --interval 5
 ```
 
 ### Specialized Trading Systems

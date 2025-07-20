@@ -94,8 +94,8 @@ dmypy.json
 
 # Local development
 local_*
-test_*
-demo_*
+# test_*
+# demo_*
 
 # Trading specific
 trading.log

@@ -1,0 +1,59 @@
+# AItrade Data Directory - Git Ignore Rules
+
+# Protect all trading data by default
+*
+
+# But track the structure and documentation
+!README.md
+!.gitignore
+!data_management.py
+
+# Allow empty directories to be tracked
+!*/
+!**/.gitkeep
+
+# Specifically exclude sensitive files
+*.log
+*.json
+*.csv
+*.parquet
+*.h5
+*.db
+*.sqlite
+
+# Backup and temporary files
+*.bak
+*.tmp
+*.temp
+*~
+.DS_Store
+
+# Compressed archives
+*.gz
+*.zip
+*.tar
+*.7z
+
+# Python cache files in data directories
+__pycache__/
+*.pyc
+*.pyo
+
+# API keys or credentials (extra protection)
+*api_key*
+*secret*
+*credential*
+*password*
+
+# Trading-specific sensitive data
+*position*
+*order*
+*balance*
+*pnl*
+*profit*
+*loss*
+
+# Personal trading information
+*account*
+*portfolio*
+*holdings*
