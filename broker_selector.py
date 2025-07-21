@@ -323,8 +323,13 @@ class BrokerSelector:
                 ask_price = current_price + (spread / 2)
                 
                 # Create a DataFrame with the latest data
+                # Keep the exact current time - don't zero seconds
+                current_time = datetime.now()
+                # Ensure timezone-naive timestamp
+                if hasattr(current_time, 'tzinfo') and current_time.tzinfo is not None:
+                    current_time = current_time.replace(tzinfo=None)
                 latest_data = pd.DataFrame({
-                    'timestamp': [datetime.now()],
+                    'timestamp': [current_time],
                     'open': [float(latest_bar['Open'])],
                     'high': [max(float(latest_bar['High']), current_price)],
                     'low': [min(float(latest_bar['Low']), current_price)],
@@ -383,7 +388,7 @@ class BrokerSelector:
             raise ConnectionError("No broker connected")
         return self.current_broker.is_paper_trading()
     
-    def _display_trading_summary(self, symbols, signals_data, historical_data):
+    def _display_trading_summary(self, symbols, signals_data, historical_data, executed_orders=None, interval=1):
         """Display a summary table showing recent 10 time periods with current column structure."""
         try:
             from tabulate import tabulate
@@ -427,22 +432,37 @@ class BrokerSelector:
                             
                             # Extract key information
                             current_price = f"${data_row.get('close', 0):.2f}"
-                            action = signal_row.get('action', '')
+                            
+                            # ONLY show actual executed orders sent to trading platform
+                            executed_action = ''
+                            if executed_orders and symbol in executed_orders:
+                                # Find executed orders for this EXACT timestamp (or very close - within 10 seconds)
+                                data_time = data_row.name if hasattr(data_row.name, 'strftime') else datetime.now()
+                                for order in executed_orders[symbol]:
+                                    # Check if order was executed within 1 second of this data point (very strict for 1-sec intervals)
+                                    time_diff = abs((order['timestamp'] - data_time).total_seconds())
+                                    if time_diff <= 1:  # Within 1 second only for precise matching
+                                        executed_action = order['action']
+                                        break
+                            
+                            # ONLY use executed actions - no calculated signals
+                            action = executed_action  # Empty string if no actual order was executed
                             macd_position = signal_row.get('macd_position', 'UNKNOWN')
                             signal_strength = signal_row.get('signal', 0)
                             
-                            # Format action with indicators
+                            # Format action - ONLY show actual executed orders
                             action_display = ''
                             if action == 'BUY':
-                                action_display = '↑ BUY'
+                                action_display = '✅ ↑ BUY'
                             elif action == 'SELL' or action == 'SHORT':
-                                action_display = '↓ SELL'
+                                action_display = '✅ ↓ SELL'
                             elif action == 'COVER_AND_BUY':
-                                action_display = '🔄 COVER→BUY'
+                                action_display = '✅ 🔄 COVER→BUY'
                             elif action == 'SELL_AND_SHORT':
-                                action_display = '🔄 SELL→SHORT'
+                                action_display = '✅ 🔄 SELL→SHORT'
                             else:
-                                action_display = '➡ HOLD'
+                                # No executed order - show empty or dash
+                                action_display = '-'
                             
                             # MACD values if available (check both column naming conventions)
                             macd_val = signal_row.get('MACD', np.nan)
@@ -494,7 +514,11 @@ class BrokerSelector:
             # Show broker and connection status
             print(f"\n🔗 Broker: {self.broker_type}")
             print(f"📡 Data Source: Yahoo Finance (PRIMARY)")
-            print(f"⏰ Next update in {1} minute(s)")
+            # Display interval (interval is already in seconds from argument)
+            if interval < 60:
+                print(f"⏰ Next update in {interval} second(s)\n")
+            else:
+                print(f"⏰ Next update in {interval/60:.1f} minute(s)\n")
             print("=" * 80 + "\n")
             
         except ImportError:
@@ -577,22 +601,22 @@ class UnifiedTradingSystem(BrokerSelector):
         strategy_instances = {}
         historical_data = {}
         signals_data = {}
+        executed_orders = {}  # Track actual executed orders
         quotes_history = {}  # Store recent quotes for display
         
         for symbol in symbols:
             try:
-                # Get historical data - use minute bars for continuous trading
-                data = self.get_historical_data(symbol, timeframe='Minute', limit=250)
-                if data.empty:
-                    logger.error(f"No historical data for {symbol}")
-                    continue
+                # Initialize with empty DataFrame - we'll collect real-time data during warm-up
+                logger.info(f"Initializing {symbol} with warm-up period (real-time data collection only)")
                 
                 # Create strategy
                 strategy = StrategyFactory.get_strategy(strategy_name, **strategy_params)
                 strategy_instances[symbol] = strategy
-                historical_data[symbol] = data
                 
-                logger.info(f"Initialized {strategy.name} for {symbol}")
+                # Start with empty historical data - will be filled with real-time data
+                historical_data[symbol] = pd.DataFrame(columns=['open', 'high', 'low', 'close', 'volume'])
+                
+                logger.info(f"Initialized {strategy.name} for {symbol} - will collect real-time data during warm-up")
                 
             except Exception as e:
                 logger.error(f"Error initializing strategy for {symbol}: {e}")
@@ -601,8 +625,18 @@ class UnifiedTradingSystem(BrokerSelector):
             logger.error("No valid symbols to trade")
             return
         
+        # Calculate minimum data needed for MACD using actual strategy parameters
+        # Get the first strategy to extract parameters
+        first_strategy = next(iter(strategy_instances.values()))
+        fast_window = getattr(first_strategy, 'fast_window', 13)
+        slow_window = getattr(first_strategy, 'slow_window', 21)
+        signal_window = getattr(first_strategy, 'signal_window', 9)
+        # Use same calculation as strategy: max(slow_window * 3, fast_window * 3) + signal_window
+        min_periods_needed = max(slow_window * 3, fast_window * 3) + signal_window
+        
         # Main continuous loop
         logger.info("Starting continuous strategy execution...")
+        logger.info(f"Warm-up period: Collecting {min_periods_needed} real-time data points before trading (fast_window={fast_window}, slow_window={slow_window}, signal_window={signal_window})")
         
         while True:
             try:
@@ -629,48 +663,122 @@ class UnifiedTradingSystem(BrokerSelector):
                             logger.warning(f"No real-time data for {symbol}")
                             continue
                         
+                        # Debug: Show what timestamp we're getting from real-time data
+                        logger.info(f"Real-time data timestamp for {symbol}: {realtime_data.index[0]}")
+                        
+                        # Check if we have any existing data
+                        if len(historical_data[symbol]) > 0:
+                            logger.info(f"Last collected data timestamp for {symbol}: {historical_data[symbol].index[-1]}")
+                        else:
+                            logger.info(f"First real-time data point collected for {symbol}")
+                        
                         # Note: During overnight hours (8 PM - 4 AM), most stocks have no real market activity
                         # Yahoo Finance will return the last known prices from market close
                         # This is expected behavior - the price should remain static until pre-market opens
                         
-                        # Update historical data
-                        updated_data = pd.concat([historical_data[symbol], realtime_data])
-                        updated_data = updated_data.iloc[-250:]  # Keep last 250 bars
-                        historical_data[symbol] = updated_data
-                        
-                        # Generate signals
-                        signals = strategy.generate_signals(updated_data)
-                        
-                        if not signals.empty:
-                            # Store signals for display
-                            signals_data[symbol] = signals
+                        # Add real-time data to our collected data
+                        if not realtime_data.empty:
+                            realtime_timestamp = realtime_data.index[0]
                             
-                            latest_signal = signals.iloc[-1]
-                            action = latest_signal.get('action', '')
+                            # Ensure timestamp is timezone-naive
+                            if hasattr(realtime_timestamp, 'tzinfo') and realtime_timestamp.tzinfo is not None:
+                                realtime_timestamp = realtime_timestamp.replace(tzinfo=None)
+                                realtime_data.index = [realtime_timestamp]
                             
-                            if action:
-                                self._execute_ibkr_signal(symbol, latest_signal, strategy)
+                            # Handle empty DataFrame case (first data point)
+                            if len(historical_data[symbol]) == 0:
+                                # First real-time data point
+                                updated_data = realtime_data.copy()
+                                historical_data[symbol] = updated_data
+                                logger.info(f"Added first real-time data for {symbol} at {realtime_timestamp}")
+                            else:
+                                # Check if timestamp already exists
+                                if realtime_timestamp not in historical_data[symbol].index:
+                                    # Add new timestamp
+                                    updated_data = pd.concat([historical_data[symbol], realtime_data])
+                                    updated_data = updated_data.sort_index()  # Sort by timestamp
+                                    updated_data = updated_data.iloc[-250:]  # Keep last 250 bars
+                                    historical_data[symbol] = updated_data
+                                    logger.info(f"Added new real-time data for {symbol} at {realtime_timestamp}")
+                                else:
+                                    # Update existing timestamp
+                                    historical_data[symbol].loc[realtime_timestamp] = realtime_data.iloc[0]
+                                    updated_data = historical_data[symbol]
+                                    logger.info(f"Updated existing real-time data for {symbol} at {realtime_timestamp}")
+                        else:
+                            updated_data = historical_data[symbol]
+                        
+                        # Check if we have enough data for reliable MACD calculation
+                        data_count = len(updated_data)
+                        is_warmup_complete = data_count >= min_periods_needed
+                        
+                        if is_warmup_complete:
+                            # Generate signals
+                            signals = strategy.generate_signals(updated_data)
+                            
+                            if not signals.empty:
+                                # Store signals for display
+                                signals_data[symbol] = signals
+                                
+                                latest_signal = signals.iloc[-1]
+                                action = latest_signal.get('action', '')
+                                
+                                if action:
+                                    logger.info(f"Executing trading signal: {action} for {symbol}")
+                                    executed_order = self._execute_ibkr_signal(symbol, latest_signal, strategy)
+                                    if executed_order:
+                                        # Track executed orders with timestamp - use the exact data timestamp
+                                        if symbol not in executed_orders:
+                                            executed_orders[symbol] = []
+                                        
+                                        # Use the timestamp of the current data point, not datetime.now()
+                                        execution_timestamp = updated_data.index[-1] if not updated_data.empty else datetime.now()
+                                        
+                                        executed_orders[symbol].append({
+                                            'timestamp': execution_timestamp,
+                                            'action': action,
+                                            'shares': latest_signal.get('shares', 100),
+                                            'price': updated_data.iloc[-1]['close'] if not updated_data.empty else None,
+                                            'order_id': executed_order
+                                        })
+                                        logger.info(f"Tracked executed order: {action} at {execution_timestamp}")
+                        else:
+                            # Still in warm-up period
+                            logger.info(f"Warm-up in progress for {symbol}: {data_count}/{min_periods_needed} data points collected")
+                            # Still generate signals for display but don't execute trades
+                            if data_count > 0:
+                                try:
+                                    signals = strategy.generate_signals(updated_data)
+                                    if not signals.empty:
+                                        signals_data[symbol] = signals
+                                except:
+                                    # MACD calculation might fail with insufficient data, that's expected
+                                    pass
                         
                     except Exception as e:
                         logger.error(f"Error processing {symbol}: {e}")
                 
                 # Display trading summary table (similar to integrated_macd_trader)
                 if signals_data:
-                    self._display_trading_summary(symbols, signals_data, historical_data)
+                    self._display_trading_summary(symbols, signals_data, historical_data, executed_orders, interval)
                 else:
                     print(f"\n⏳ Collecting data... {len(symbols)} symbol(s) being monitored")
                     print(f"🔗 Broker: {self.broker_type} | 📡 Data Source: Yahoo Finance (PRIMARY)")
-                    print(f"⏰ Next update in {interval} minute(s)\n")
+                    # Display interval (interval is already in seconds from argument)
+                    if interval < 60:
+                        print(f"⏰ Next update in {interval} second(s)\n")
+                    else:
+                        print(f"⏰ Next update in {interval/60:.1f} minute(s)\n")
                 
-                # Wait for next interval
-                time.sleep(interval * 60)
+                # Wait for next interval (interval is already in seconds)
+                time.sleep(interval)
                 
             except KeyboardInterrupt:
                 logger.info("Strategy stopped by user")
                 break
             except Exception as e:
                 logger.error(f"Error in continuous strategy: {e}")
-                time.sleep(interval * 60)
+                time.sleep(interval)
     
     def _execute_ibkr_signal(self, symbol, signal, strategy):
         """Execute trading signal with IBKR."""
@@ -678,36 +786,38 @@ class UnifiedTradingSystem(BrokerSelector):
         shares = signal.get('shares', 100)
         
         if not action:
-            return
+            return None
         
         try:
             # Import OrderSide for compatibility
             from alpaca.trading.enums import OrderSide
             
+            order_id = None
             if action == 'BUY':
-                self.place_market_order(symbol, shares, OrderSide.BUY)
+                order_id = self.place_market_order(symbol, shares, OrderSide.BUY)
             elif action == 'SHORT':
-                self.place_market_order(symbol, shares, OrderSide.SELL)
+                order_id = self.place_market_order(symbol, shares, OrderSide.SELL)
             elif action == 'COVER_AND_BUY':
                 # Cover short first, then buy
                 positions = self.get_all_positions()
                 current_pos = next((p for p in positions if p.symbol == symbol), None)
                 if current_pos and current_pos.side == 'short':
                     cover_qty = int(current_pos.qty)
-                    self.place_market_order(symbol, cover_qty, OrderSide.BUY)
+                    cover_order_id = self.place_market_order(symbol, cover_qty, OrderSide.BUY)
                     time.sleep(2)
-                self.place_market_order(symbol, shares, OrderSide.BUY)
+                order_id = self.place_market_order(symbol, shares, OrderSide.BUY)
             elif action == 'SELL_AND_SHORT':
                 # Sell long first, then short
                 positions = self.get_all_positions()
                 current_pos = next((p for p in positions if p.symbol == symbol), None)
                 if current_pos and current_pos.side == 'long':
                     sell_qty = int(current_pos.qty)
-                    self.place_market_order(symbol, sell_qty, OrderSide.SELL)
+                    sell_order_id = self.place_market_order(symbol, sell_qty, OrderSide.SELL)
                     time.sleep(2)
-                self.place_market_order(symbol, shares, OrderSide.SELL)
+                order_id = self.place_market_order(symbol, shares, OrderSide.SELL)
             
             # Save strategy state
+            from datetime import datetime
             self.save_strategy_state(symbol, strategy.name, {
                 'last_action': action,
                 'shares': shares,
@@ -715,9 +825,11 @@ class UnifiedTradingSystem(BrokerSelector):
             })
             
             logger.info(f"Executed {action} for {symbol}: {shares} shares")
+            return order_id
             
         except Exception as e:
             logger.error(f"Error executing signal for {symbol}: {e}")
+            return None
     
     def run_with_realtime_data(self, symbols, strategy_name="macd", **strategy_params):
         """Run with real-time data (delegates to current broker)."""

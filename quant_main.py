@@ -1349,8 +1349,8 @@ def main():
                         help='Symbols to trade (space-separated). Uses DEFAULT_SYMBOLS if not provided')
     parser.add_argument('--strategy', type=str,
                         help='Strategy to use. Uses DEFAULT_STRATEGY if not provided')
-    parser.add_argument('--interval', type=int, default=1,
-                        help='Interval in minutes for continuous mode (default: 1)')
+    parser.add_argument('--interval', type=int, default=60,
+                        help='Update interval in seconds (default: 60)')
     parser.add_argument('--broker', type=str, choices=['auto', 'ibkr', 'alpaca', 'legacy'], default='auto',
                         help='Broker selection: auto=IBKR+Alpaca unified, ibkr=force IBKR, alpaca=force Alpaca, legacy=Alpaca-only system')
     parser.add_argument('--interactive', action='store_true',
@@ -1427,8 +1427,9 @@ def main():
         logger.info("=" * 40)
         
         if args.mode == 'continuous':
-            logger.info(f"Running continuously with {args.interval} minute intervals")
+            logger.info(f"Running continuously with {args.interval} second intervals")
             logger.info("Press Ctrl+C to stop")
+            # Pass interval directly in seconds (no conversion needed)
             trading_system.run_continuous_strategy(
                 symbols, 
                 strategy_name=strategy_name, 

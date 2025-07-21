@@ -180,15 +180,16 @@ class IBKRTradingSystem:
                             self.market_value = str(market_value)
                     
                     side = 'long' if pos.position > 0 else 'short'
+                    market_value = getattr(pos, 'marketValue', 0) or getattr(pos, 'market_value', 0) or 0
                     position_obj = Position(
                         pos.contract.symbol,
                         pos.position,
                         side,
-                        pos.marketValue
+                        market_value
                     )
                     position_list.append(position_obj)
                     
-                    logger.info(f"Position: {pos.contract.symbol}, Qty: {pos.position}, Value: ${pos.marketValue}")
+                    logger.info(f"Position: {pos.contract.symbol}, Qty: {pos.position}, Value: ${market_value}")
             
             logger.info(f"Current positions: {len(position_list)}")
             return position_list
@@ -259,6 +260,10 @@ class IBKRTradingSystem:
                 df.set_index('timestamp', inplace=True)
                 df.index = pd.to_datetime(df.index)
                 
+                # Ensure timezone-naive timestamps for consistency
+                if df.index.tz is not None:
+                    df.index = df.index.tz_localize(None)
+                
                 # Ensure numeric columns
                 for col in ['open', 'high', 'low', 'close', 'volume']:
                     if col in df.columns:
@@ -282,8 +287,13 @@ class IBKRTradingSystem:
             self.ib.sleep(1)  # Wait for data
             
             if ticker.last and ticker.bid and ticker.ask:
+                # Ensure timezone-naive timestamp
+                current_time = datetime.now()
+                if hasattr(current_time, 'tzinfo') and current_time.tzinfo is not None:
+                    current_time = current_time.replace(tzinfo=None)
+                    
                 latest_data = pd.DataFrame({
-                    'timestamp': [datetime.now()],
+                    'timestamp': [current_time],
                     'open': [float(ticker.last)],
                     'high': [float(ticker.ask)],
                     'low': [float(ticker.bid)],
