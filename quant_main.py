@@ -208,9 +208,68 @@ class AlpacaTradingSystem:
                 # For minute data, limit to last 7 days to avoid huge datasets
                 start = max(start, end - timedelta(days=7))
             
-            # Try to get data from Alpaca
+            # Try Yahoo Finance first (PRIMARY)
+            if 'yf' in globals():
+                logger.info(f"Attempting to get data from Yahoo Finance (PRIMARY) for {symbol}")
+                try:
+                    # Map Alpaca timeframe to Yahoo Finance interval
+                    interval = '1d'  # default to daily
+                    if timeframe == TimeFrame.Minute:
+                        interval = '1m'
+                        # For minute data, limit period to avoid too much data
+                        period = f'{min(limit // 60, 7)}d'  # Convert minutes to days, max 7 days
+                        if limit <= 60:  # Less than 1 hour
+                            period = '1d'  # Get at least 1 day
+                    elif timeframe == TimeFrame.Hour:
+                        interval = '1h'
+                        period = f'{min(limit // 24, 30)}d'  # Convert hours to days, max 30 days
+                    
+                    # Use different parameters based on timeframe
+                    if timeframe == TimeFrame.Minute:
+                        # For minute data, use period instead of start/end to avoid too much data
+                        df = yf.download(
+                            symbol,
+                            period=period,
+                            interval=interval,
+                            prepost=True  # Include pre/post market data
+                        )
+                        # Limit to requested number of bars
+                        if len(df) > limit:
+                            df = df.tail(limit)
+                    else:
+                        # For daily/hourly data, use start/end dates
+                        df = yf.download(
+                            symbol,
+                            start=start,
+                            end=end,
+                            interval=interval,
+                            prepost=True  # Include pre/post market data
+                        )
+                    
+                    if not df.empty:
+                        # Rename columns to match Alpaca format
+                        df.rename(columns={
+                            'Open': 'open',
+                            'High': 'high',
+                            'Low': 'low',
+                            'Close': 'close',
+                            'Adj Close': 'adj_close',
+                            'Volume': 'volume'
+                        }, inplace=True)
+                        
+                        # Cache the data
+                        df.to_csv(cache_file)
+                        logger.info(f"Retrieved {len(df)} bars for {symbol} from Yahoo Finance (PRIMARY) and cached to {cache_file}")
+                        return df
+                    else:
+                        logger.warning(f"No data returned from Yahoo Finance for {symbol}")
+                except Exception as yf_error:
+                    logger.error(f"Yahoo Finance (PRIMARY) failed for {symbol}: {yf_error}")
+
+            # Fall back to Alpaca if Yahoo Finance fails
             try:
-                # First attempt with Alpaca's data API
+                logger.info(f"Falling back to Alpaca API for {symbol}")
+                # Alpaca's data API
                 bars_request = StockBarsRequest(
                     symbol_or_symbols=[symbol],
                     timeframe=timeframe,
@@ -246,7 +305,7 @@ class AlpacaTradingSystem:
                         
                         # Cache the data
                         df.to_csv(cache_file)
-                        logger.info(f"Retrieved {len(df)} bars for {symbol} from Alpaca and cached to {cache_file}")
+                        logger.info(f"Retrieved {len(df)} bars for {symbol} from Alpaca (FALLBACK) and cached to {cache_file}")
                         return df
                     else:
                         logger.warning(f"No bars returned for {symbol} from Alpaca")
@@ -254,44 +313,7 @@ class AlpacaTradingSystem:
                     logger.warning(f"No data found for {symbol} from Alpaca API")
             
             except Exception as e:
-                logger.error(f"Error retrieving data from Alpaca: {e}")
-                
-                # Fall back to Yahoo Finance if Alpaca fails and we have it imported
-                if 'yf' in globals():
-                    logger.info(f"Falling back to Yahoo Finance for {symbol}")
-                    try:
-                        # Map Alpaca timeframe to Yahoo Finance interval
-                        interval = '1d'  # default to daily
-                        if timeframe == TimeFrame.Minute:
-                            interval = '1m'
-                        elif timeframe == TimeFrame.Hour:
-                            interval = '1h'
-                        
-                        df = yf.download(
-                            symbol,
-                            start=start,
-                            end=end,
-                            interval=interval,
-                            progress=False
-                        )
-                        
-                        if not df.empty:
-                            # Rename columns to match Alpaca format
-                            df.rename(columns={
-                                'Open': 'open',
-                                'High': 'high',
-                                'Low': 'low',
-                                'Close': 'close',
-                                'Adj Close': 'adj_close',
-                                'Volume': 'volume'
-                            }, inplace=True)
-                            
-                            # Cache the data
-                            df.to_csv(cache_file)
-                            logger.info(f"Retrieved {len(df)} bars for {symbol} from Yahoo Finance fallback")
-                            return df
-                    except Exception as yf_error:
-                        logger.error(f"Yahoo Finance fallback also failed: {yf_error}")
+                logger.error(f"Error retrieving data from Alpaca (FALLBACK): {e}")
             
             # If we get here, all methods failed
             # Check for any existing cache files for this symbol
@@ -437,8 +459,8 @@ class AlpacaTradingSystem:
         
         # Initialize with historical data
         for symbol in symbols:
-            # Get historical data for initial strategy setup - increased limit for more accurate MACD
-            data = self.get_historical_data(symbol, limit=250)  # Increased from 100 to 250 for better MACD accuracy
+            # Get historical data for initial strategy setup - use minute bars for continuous trading
+            data = self.get_historical_data(symbol, timeframe=TimeFrame.Minute, limit=250)  # Minute bars for continuous trading
             if data.empty:
                 logger.error(f"No historical data available for {symbol}, skipping")
                 continue
@@ -677,9 +699,17 @@ class AlpacaTradingSystem:
                 except Exception as e:
                     logger.error(f"Error processing {symbol}: {e}")
             
+            # Display summary (simple version for Alpaca legacy mode)
+            try:
+                from datetime import datetime
+                print(f"\n📊 ALPACA LEGACY MODE - {datetime.now().strftime('%H:%M:%S')}")
+                print(f"🔗 Broker: Alpaca (Legacy) | 📡 Data Source: Yahoo Finance (PRIMARY)")
+                print(f"⏰ Next update in {interval} minute(s)")
+                print("-" * 60 + "\n")
+            except:
+                pass
+            
             # Sleep until next interval
-            logger.info(f"Waiting for next execution in {interval} minute(s)...")
-            logger.info("\n" + "-"*80 + "\n")  # Add a visual separator in logs between intervals
             time.sleep(interval * 60)
     
     def run_with_realtime_data(self, symbols, strategy_name="macd", **strategy_params):

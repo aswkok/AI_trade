@@ -38,7 +38,7 @@ The codebase merges technical analysis automation with AI-driven market analysis
 ### Key Integration Points
 
 1. **🆕 Broker Layer**: **IBKR TWS API (primary)** with **Alpaca API (fallback)** for professional execution
-2. **Data Layer**: Both systems share data sources (IBKR, Alpaca, Yahoo Finance, market data caching)
+2. **🆕 Data Layer**: Both systems share data sources (Yahoo Finance primary, IBKR/Alpaca fallback, market data caching)
 3. **Decision Synthesis**: AI analysis can inform quantitative strategy parameters
 4. **Risk Management**: Combined technical and fundamental risk assessment
 5. **Execution**: Unified system handles trade execution via **IBKR first, then Alpaca**
@@ -71,6 +71,10 @@ export PAPER_DATA_URL=https://data.alpaca.markets
 # AI Agent System
 export OPENAI_API_KEY=your_openai_key  # Or DeepSeek key
 export FINNHUB_API_KEY=your_finnhub_key
+
+# 🆕 Data Source Configuration (Yahoo Finance Primary)
+export DATA_SOURCE=YAHOO           # YAHOO (primary), ALPACA (fallback)
+export YAHOO_PRICE_TYPE=MID        # MID (bid/ask average), CLOSE (close price)
 
 # 🆕 Broker Selection
 export FORCE_BROKER=AUTO           # AUTO, IBKR, ALPACA
@@ -167,12 +171,12 @@ python quant_main.py --mode historical --symbols AAPL  # Quick test
 4. **Risk Assessment**: Multi-perspective risk evaluation (conservative, aggressive, neutral)
 5. **Final Decision**: Portfolio manager approves/rejects with comprehensive reasoning
 
-### Data Source Architecture
-- **Primary**: Alpaca API for real-time trading and execution
-- **Fallback**: Yahoo Finance for extended hours and backup data
+### Data Source Architecture (🆕 UPDATED)
+- **🆕 PRIMARY**: Yahoo Finance for real-time and historical data (24/7 availability)
+- **FALLBACK**: IBKR/Alpaca APIs for broker-specific data and execution
 - **AI Data**: FinnHub, Google News, Reddit via specialized dataflows
 - **Caching**: Local CSV caching for historical data and backtesting
-- **Selection**: `quote_monitor_selector.py` automatically chooses optimal data source
+- **Selection**: `quote_monitor_selector.py` and `broker_selector.py` with Yahoo Finance priority
 
 ### State Management Patterns
 ```python
@@ -321,13 +325,22 @@ if ai_decision['recommendation'] == 'BUY' and signals['action'] == 'BUY':
     execute_trade('NVDA', 'BUY', enhanced_confidence=True)
 ```
 
-### Data Source Redundancy
+### Data Source Redundancy (🆕 UPDATED)
 ```python
-# Automatic fallback between data sources
-try:
-    quotes = alpaca_client.get_latest_quotes()
-except Exception:
-    quotes = yahoo_finance_fallback.get_quotes()
+# 🆕 NEW: Yahoo Finance primary with broker fallback
+def get_realtime_data(symbol):
+    # Try Yahoo Finance first (PRIMARY)
+    try:
+        quote_data = yahoo_finance.get_latest_quote(symbol)
+        return quote_data
+    except Exception:
+        # Fall back to broker APIs (IBKR/Alpaca)
+        return broker_client.get_latest_quotes(symbol)
+
+# Historical data with same priority
+def get_historical_data(symbol):
+    # Yahoo Finance first, then Alpaca, then cache
+    return yahoo_finance.download(symbol) or alpaca_api.get_bars(symbol) or local_cache.get(symbol)
 ```
 
 This architecture enables both systematic algorithmic trading and intelligent AI-driven market analysis, with robust risk management and execution capabilities across all market sessions.

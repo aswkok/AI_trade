@@ -212,10 +212,15 @@ class IBKRTradingSystem:
                 duration = f'{limit} D'
             elif timeframe == 'Hour':
                 bar_size = '1 hour'
-                duration = f'{min(limit, 24)} D'
+                duration = f'{min(limit, 120)} H'  # Hours, max 120 hours (5 days)
             elif timeframe == 'Minute':
                 bar_size = '1 min'
-                duration = f'{min(limit, 1440)} S'  # seconds for minute data
+                # For minute data, IBKR limits historical requests
+                # Use days for longer periods, seconds for very short periods
+                if limit <= 1440:  # Less than 1 day of minutes
+                    duration = f'{limit * 60} S'  # Convert minutes to seconds
+                else:
+                    duration = f'{min(limit // 1440 + 1, 30)} D'  # Convert to days, max 30 days
             else:
                 bar_size = '1 day'
                 duration = f'{limit} D'

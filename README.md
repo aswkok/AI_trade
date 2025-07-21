@@ -22,7 +22,8 @@ A comprehensive trading platform that combines quantitative analysis with AI-dri
 - **Real-time MACD-based trading** with live market data streams
 - **Professional-grade execution** with Interactive Brokers integration
 - **Dual-mode architecture**: Stock trading and sophisticated options trading
-- **Multiple data sources**: IBKR, Alpaca API, with Yahoo Finance fallback
+- **🆕 Yahoo Finance primary data**: Real-time and historical data with extended hours support
+- **Multiple data sources**: Yahoo Finance (primary), IBKR/Alpaca APIs (fallback)
 - **Advanced risk management** with position sizing and portfolio limits
 - **Extended hours trading** support (pre-market, after-hours, overnight)
 - **Real-time monitoring** with terminal and web-based interfaces
@@ -104,6 +105,10 @@ MAX_POSITIONS=5
 EXTENDED_HOURS=True
 OVERNIGHT_TRADING=True
 
+# 🆕 Data Source Configuration (NEW)
+DATA_SOURCE=YAHOO           # YAHOO (primary), ALPACA (override)
+YAHOO_PRICE_TYPE=MID        # MID (bid/ask avg) or CLOSE (close price)
+
 # Broker Selection (AUTO, IBKR, ALPACA)
 FORCE_BROKER=AUTO           # AUTO = IBKR first, then Alpaca
 ```
@@ -123,6 +128,66 @@ FORCE_BROKER=AUTO           # AUTO = IBKR first, then Alpaca
    ```
 
 See [IBKR_SETUP.md](IBKR_SETUP.md) for detailed setup instructions.
+
+## 📊 Data Sources Architecture
+
+### 🆕 Yahoo Finance Primary (NEW)
+
+**Real-time Data** (✅ PRIMARY):
+- Post-market data (4:00 PM - 8:00 PM ET)  
+- Pre-market data (4:00 AM - 9:30 AM ET)
+- Overnight data (8:00 PM - 4:00 AM ET) - sparse but available
+- Regular market data (9:30 AM - 4:00 PM ET)
+- **No API key required** - free access
+- **Extended hours support** - 24/7 availability
+
+**Historical Data** (✅ PRIMARY):
+- Up to minute-level granularity
+- Extended hours included (`prepost=True`)
+- Automatic data caching
+- Reliable fallback source
+
+### Broker APIs (FALLBACK)
+
+**IBKR TWS API** (Secondary for data):
+- Professional-grade tick data
+- Real-time options data
+- Advanced order types
+- Account management
+
+**Alpaca API** (Fallback for data):
+- WebSocket streaming quotes
+- REST API historical data
+- Real-time trade execution
+- Paper trading support
+
+### Data Source Hierarchy
+
+```bash
+# Real-time data priority:
+1. Yahoo Finance (PRIMARY) → Always tries first
+2. Broker APIs (FALLBACK) → IBKR/Alpaca if Yahoo fails
+
+# Historical data priority:
+1. Yahoo Finance (PRIMARY) → Always tries first  
+2. Alpaca API (FALLBACK) → If Yahoo fails
+3. Local cache (BACKUP) → If both fail
+
+# Configuration
+DATA_SOURCE=YAHOO           # Set Yahoo as primary (NEW default)
+YAHOO_PRICE_TYPE=MID        # MID (bid/ask avg) or CLOSE (close price)
+```
+
+### Extended Hours Trading
+
+| Session | Time (ET) | Yahoo Finance | IBKR | Alpaca |
+|---------|-----------|---------------|------|--------|
+| Pre-market | 4:00 AM - 9:30 AM | ✅ Available | ✅ Professional | ✅ Available |
+| Regular | 9:30 AM - 4:00 PM | ✅ Available | ✅ Professional | ✅ Available |  
+| After-hours | 4:00 PM - 8:00 PM | ✅ Available | ✅ Professional | ✅ Available |
+| Overnight | 8:00 PM - 4:00 AM | ✅ Sparse | ✅ Limited* | ❌ None |
+
+*IBKR overnight requires special permissions
 
 ## 🎯 Command Line Interface
 

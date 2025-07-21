@@ -259,10 +259,97 @@ class BrokerSelector:
         return self.current_broker.get_historical_data(symbol, timeframe, limit)
     
     def get_realtime_data(self, symbol):
-        """Get real-time data."""
-        if not self.current_broker:
-            raise ConnectionError("No broker connected")
-        return self.current_broker.get_realtime_data(symbol)
+        """Get real-time data with Yahoo Finance as PRIMARY source."""
+        # Try Yahoo Finance first (PRIMARY for real-time data)
+        try:
+            logger.info(f"Attempting to get real-time data from Yahoo Finance (PRIMARY) for {symbol}")
+            import yfinance as yf
+            import pandas as pd
+            from datetime import datetime
+            
+            ticker = yf.Ticker(symbol)
+            
+            # Get the latest quote information
+            quote_info = ticker.info
+            history = ticker.history(period="1d", interval="1m", prepost=True)
+            
+            if not history.empty:
+                latest_bar = history.iloc[-1]
+                
+                # Try to get real-time price from different sources
+                current_price = None
+                is_extended_hours = False
+                
+                # Check for post-market price
+                if 'postMarketPrice' in quote_info and quote_info['postMarketPrice'] and quote_info['postMarketPrice'] > 0:
+                    current_price = float(quote_info['postMarketPrice'])
+                    is_extended_hours = True
+                    logger.info(f"Using post-market price: ${current_price}")
+                # Check for pre-market price
+                elif 'preMarketPrice' in quote_info and quote_info['preMarketPrice'] and quote_info['preMarketPrice'] > 0:
+                    current_price = float(quote_info['preMarketPrice'])
+                    is_extended_hours = True
+                    logger.info(f"Using pre-market price: ${current_price}")
+                # Check for regular market price
+                elif 'regularMarketPrice' in quote_info and quote_info['regularMarketPrice'] and quote_info['regularMarketPrice'] > 0:
+                    current_price = float(quote_info['regularMarketPrice'])
+                    logger.info(f"Using regular market price: ${current_price}")
+                # Fall back to latest close from history
+                else:
+                    current_price = float(latest_bar['Close'])
+                    logger.info(f"Using latest close price: ${current_price}")
+                
+                # Determine actual session type
+                current_hour = datetime.now().hour
+                session_type = "regular hours"
+                
+                if current_hour >= 20 or current_hour < 4:  # 8 PM - 4 AM ET
+                    session_type = "overnight"
+                elif current_hour >= 16:  # 4 PM - 8 PM ET
+                    session_type = "after-hours"
+                elif current_hour < 9 or (current_hour == 9 and datetime.now().minute < 30):  # 4 AM - 9:30 AM ET
+                    session_type = "pre-market"
+                
+                # Estimate bid/ask from the current price (typical spread varies by session)
+                if session_type == "overnight":
+                    spread_pct = 0.003  # Wider spread during overnight (0.3%)
+                elif session_type in ["after-hours", "pre-market"]:
+                    spread_pct = 0.002  # Moderate spread during extended hours (0.2%)
+                else:
+                    spread_pct = 0.001  # Normal spread during regular hours (0.1%)
+                
+                spread = current_price * spread_pct
+                bid_price = current_price - (spread / 2)
+                ask_price = current_price + (spread / 2)
+                
+                # Create a DataFrame with the latest data
+                latest_data = pd.DataFrame({
+                    'timestamp': [datetime.now()],
+                    'open': [float(latest_bar['Open'])],
+                    'high': [max(float(latest_bar['High']), current_price)],
+                    'low': [min(float(latest_bar['Low']), current_price)],
+                    'close': [current_price],
+                    'volume': [float(latest_bar['Volume'])]
+                })
+                latest_data.set_index('timestamp', inplace=True)
+                
+                logger.info(f"Retrieved real-time data from Yahoo Finance (PRIMARY): ${current_price} ({session_type})")
+                return latest_data
+            else:
+                logger.warning(f"No recent history data from Yahoo Finance for {symbol}")
+                
+        except Exception as e:
+            logger.error(f"Yahoo Finance (PRIMARY) real-time data failed for {symbol}: {e}")
+        
+        # Fall back to broker real-time data if Yahoo Finance fails
+        try:
+            if not self.current_broker:
+                raise ConnectionError("No broker connected")
+            logger.info(f"Falling back to {self.broker_type} for real-time data for {symbol}")
+            return self.current_broker.get_realtime_data(symbol)
+        except Exception as e:
+            logger.error(f"Broker ({self.broker_type}) real-time data also failed for {symbol}: {e}")
+            return pd.DataFrame()  # Return empty DataFrame if all sources fail
     
     def place_market_order(self, symbol, qty, side, extended_hours=None):
         """Place market order."""
@@ -296,6 +383,133 @@ class BrokerSelector:
             raise ConnectionError("No broker connected")
         return self.current_broker.is_paper_trading()
     
+    def _display_trading_summary(self, symbols, signals_data, historical_data):
+        """Display a summary table showing recent 10 time periods with current column structure."""
+        try:
+            from tabulate import tabulate
+            from datetime import datetime
+            import numpy as np
+            import pandas as pd
+            
+            print("\n" + "=" * 80)
+            print(f"🎯 TRADING SUMMARY - {datetime.now().strftime('%H:%M:%S')}")
+            print("=" * 80)
+            
+            # Create summary data for recent 10 time periods
+            summary_rows = []
+            
+            for symbol in symbols:
+                try:
+                    if symbol not in signals_data or symbol not in historical_data:
+                        continue
+                    
+                    signals = signals_data[symbol]
+                    data = historical_data[symbol]
+                    
+                    if signals.empty or data.empty:
+                        continue
+                    
+                    # Get last 10 periods (or fewer if not available)
+                    recent_periods = min(10, len(signals), len(data))
+                    
+                    # Display most recent periods first (reverse order like integrated_macd_trader)
+                    for i in range(recent_periods-1, -1, -1):
+                        try:
+                            signal_row = signals.iloc[-(i+1)]  # Get from most recent backwards
+                            data_row = data.iloc[-(i+1)]
+                            
+                            # Get timestamp for this period
+                            if hasattr(data_row.name, 'strftime'):
+                                time_str = data_row.name.strftime('%H:%M:%S')
+                            else:
+                                # Fallback time display
+                                time_str = f"{recent_periods-i:02d}:00"
+                            
+                            # Extract key information
+                            current_price = f"${data_row.get('close', 0):.2f}"
+                            action = signal_row.get('action', '')
+                            macd_position = signal_row.get('macd_position', 'UNKNOWN')
+                            signal_strength = signal_row.get('signal', 0)
+                            
+                            # Format action with indicators
+                            action_display = ''
+                            if action == 'BUY':
+                                action_display = '↑ BUY'
+                            elif action == 'SELL' or action == 'SHORT':
+                                action_display = '↓ SELL'
+                            elif action == 'COVER_AND_BUY':
+                                action_display = '🔄 COVER→BUY'
+                            elif action == 'SELL_AND_SHORT':
+                                action_display = '🔄 SELL→SHORT'
+                            else:
+                                action_display = '➡ HOLD'
+                            
+                            # MACD values if available (check both column naming conventions)
+                            macd_val = signal_row.get('MACD', np.nan)
+                            signal_val = signal_row.get('Signal', signal_row.get('MACD_signal', np.nan))
+                            
+                            # Calculate histogram if we have both MACD and Signal values
+                            if not pd.isna(macd_val) and not pd.isna(signal_val):
+                                histogram = macd_val - signal_val
+                            else:
+                                histogram = signal_row.get('MACD_histogram', np.nan)
+                            
+                            # Format MACD values - only check for NaN, zero is a valid value
+                            macd_str = f"{macd_val:.6f}" if not pd.isna(macd_val) else "N/A"
+                            signal_str = f"{signal_val:.6f}" if not pd.isna(signal_val) else "N/A"
+                            histogram_str = f"{histogram:.6f}" if not pd.isna(histogram) else "N/A"
+                            
+                            # Add time column and keep existing structure
+                            summary_rows.append([
+                                time_str,  # Time instead of symbol for recent periods
+                                symbol,
+                                current_price,
+                                macd_str,
+                                signal_str, 
+                                histogram_str,
+                                macd_position,
+                                action_display,
+                                f"{signal_strength:.2f}" if signal_strength != 0 else "0.00"
+                            ])
+                            
+                        except Exception as e:
+                            logger.warning(f"Error processing period {i} for {symbol}: {e}")
+                            continue
+                    
+                except Exception as e:
+                    logger.warning(f"Error creating summary for {symbol}: {e}")
+                    continue
+            
+            if summary_rows:
+                headers = ['Time', 'Symbol', 'Price', 'MACD', 'Signal', 'Histogram', 'Position', 'Action', 'Strength']
+                print(tabulate(
+                    summary_rows,
+                    headers=headers,
+                    tablefmt='pretty',
+                    showindex=False
+                ))
+            else:
+                print("📊 No trading data available for display")
+            
+            # Show broker and connection status
+            print(f"\n🔗 Broker: {self.broker_type}")
+            print(f"📡 Data Source: Yahoo Finance (PRIMARY)")
+            print(f"⏰ Next update in {1} minute(s)")
+            print("=" * 80 + "\n")
+            
+        except ImportError:
+            # Fallback if tabulate is not available
+            print(f"\n📊 TRADING SUMMARY - {datetime.now().strftime('%H:%M:%S')}")
+            print(f"🔗 Broker: {self.broker_type} | 📡 Data: Yahoo Finance (PRIMARY)")
+            for symbol in symbols:
+                if symbol in signals_data and not signals_data[symbol].empty:
+                    latest_signal = signals_data[symbol].iloc[-1]
+                    action = latest_signal.get('action', 'HOLD')
+                    print(f"  {symbol}: {action}")
+            print("-" * 50 + "\n")
+        except Exception as e:
+            logger.error(f"Error displaying trading summary: {e}")
+
     def disconnect(self):
         """Disconnect from current broker."""
         if self.current_broker:
@@ -344,6 +558,7 @@ class UnifiedTradingSystem(BrokerSelector):
         import time
         import signal
         import sys
+        import pandas as pd
         from datetime import datetime
         from strategies import StrategyFactory
         
@@ -358,14 +573,16 @@ class UnifiedTradingSystem(BrokerSelector):
         
         signal.signal(signal.SIGINT, signal_handler)
         
-        # Initialize strategies
+        # Initialize strategies and data storage
         strategy_instances = {}
         historical_data = {}
+        signals_data = {}
+        quotes_history = {}  # Store recent quotes for display
         
         for symbol in symbols:
             try:
-                # Get historical data
-                data = self.get_historical_data(symbol, limit=250)
+                # Get historical data - use minute bars for continuous trading
+                data = self.get_historical_data(symbol, timeframe='Minute', limit=250)
                 if data.empty:
                     logger.error(f"No historical data for {symbol}")
                     continue
@@ -412,6 +629,10 @@ class UnifiedTradingSystem(BrokerSelector):
                             logger.warning(f"No real-time data for {symbol}")
                             continue
                         
+                        # Note: During overnight hours (8 PM - 4 AM), most stocks have no real market activity
+                        # Yahoo Finance will return the last known prices from market close
+                        # This is expected behavior - the price should remain static until pre-market opens
+                        
                         # Update historical data
                         updated_data = pd.concat([historical_data[symbol], realtime_data])
                         updated_data = updated_data.iloc[-250:]  # Keep last 250 bars
@@ -421,19 +642,27 @@ class UnifiedTradingSystem(BrokerSelector):
                         signals = strategy.generate_signals(updated_data)
                         
                         if not signals.empty:
+                            # Store signals for display
+                            signals_data[symbol] = signals
+                            
                             latest_signal = signals.iloc[-1]
                             action = latest_signal.get('action', '')
                             
                             if action:
                                 self._execute_ibkr_signal(symbol, latest_signal, strategy)
                         
-                        logger.info(f"Processed {symbol}")
-                        
                     except Exception as e:
                         logger.error(f"Error processing {symbol}: {e}")
                 
+                # Display trading summary table (similar to integrated_macd_trader)
+                if signals_data:
+                    self._display_trading_summary(symbols, signals_data, historical_data)
+                else:
+                    print(f"\n⏳ Collecting data... {len(symbols)} symbol(s) being monitored")
+                    print(f"🔗 Broker: {self.broker_type} | 📡 Data Source: Yahoo Finance (PRIMARY)")
+                    print(f"⏰ Next update in {interval} minute(s)\n")
+                
                 # Wait for next interval
-                logger.info(f"Waiting {interval} minutes for next execution...")
                 time.sleep(interval * 60)
                 
             except KeyboardInterrupt:
